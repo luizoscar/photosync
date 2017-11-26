@@ -27,9 +27,13 @@ from gi.repository import Gdk, Gtk, GObject, GLib
 
 
 class VideoEncodeProgressDialog(Gtk.Dialog):
+    """
+    Dialog utilizada para exibir o progresso da conversão de vídeos
+    """
+    
     total = 0
-    completed_size = 0
-    must_stop = False
+    completedSize = 0
+    mustStop = False
     failed = False
 
     def __init__(self, parent, arquivos, destino):
@@ -39,8 +43,8 @@ class VideoEncodeProgressDialog(Gtk.Dialog):
         self.set_size_request(250, 150)
         self.set_border_width(10)
 
-        self.lista_arquivos = arquivos
-        self.dir_destino = destino
+        self.listaArquivos = arquivos
+        self.dirDestino = destino
 
         # Container principal
         grid = Gtk.Grid()
@@ -49,62 +53,72 @@ class VideoEncodeProgressDialog(Gtk.Dialog):
         grid.set_column_spacing(4)
         grid.set_row_spacing(6)
 
-        for arquivo in self.lista_arquivos:
+        for arquivo in self.listaArquivos:
             self.total = self.total + os.stat(arquivo).st_size
 
         # Label com o título da atividade
-        grid.attach(Gtk.Label(label="Efetuando a re-codificação de " + str(len(arquivos)) +
-                              " arquivos (" + human_size(self.total) + ")", halign=Gtk.Align.START), 0, 0, 6, 1)
+        grid.attach(Gtk.Label(label="Efetuando a re-codificação de " + str(len(arquivos)) + 
+                              " arquivos (" + to_human_size(self.total) + ")", halign=Gtk.Align.START), 0, 0, 6, 1)
 
         # Progresso total
-        self.progress_bar_total = Gtk.ProgressBar(show_text=True)
-        grid.attach(self.progress_bar_total, 0, 1, 6, 1)
+        self.progressBarTotal = Gtk.ProgressBar(show_text=True)
+        grid.attach(self.progressBarTotal, 0, 1, 6, 1)
 
         # Titulo de info do progresso global
-        self.progress_label_total = Gtk.Label(halign=Gtk.Align.START)
-        grid.attach(self.progress_label_total, 0, 2, 6, 1)
+        self.labelProgressTotal = Gtk.Label(halign=Gtk.Align.START)
+        grid.attach(self.labelProgressTotal, 0, 2, 6, 1)
 
         # Progresso da conversão do arquivo
-        self.progress_bar_arquivo = Gtk.ProgressBar(show_text=True)
-        grid.attach(self.progress_bar_arquivo, 0, 3, 6, 1)
+        self.progressbarAtual = Gtk.ProgressBar(show_text=True)
+        grid.attach(self.progressbarAtual, 0, 3, 6, 1)
 
         # Titulo do arquivo
-        self.progress_label_arquivo = Gtk.Label(halign=Gtk.Align.START)
-        grid.attach(self.progress_label_arquivo, 0, 4, 6, 1)
+        self.labelAtual = Gtk.Label(halign=Gtk.Align.START)
+        grid.attach(self.labelAtual, 0, 4, 6, 1)
 
         self.get_content_area().pack_start(grid, True, True, 0)
         self.show_all()
 
-        thread = Thread(target=self.copia_arquivos)
+        # Inicia a threa de conversão de vídeos
+        thread = Thread(target=self.processa_videos)
         thread.daemon = True
         thread.start()
 
-    def update_progess(self, titulo_barra_total, progresso_total, titulo_label_total, titulo_label_atual):
-        # Atualiza os contadores do arquivo atual e progresso total
-        self.progress_bar_total.set_text(titulo_barra_total)
-        self.progress_bar_total.set_fraction(progresso_total)  # O processo deve ser entre 0.0 e 1.0
-        self.progress_label_total.set_text(titulo_label_total)
-        self.progress_label_arquivo.set_text(titulo_label_atual)
+    def update_progess(self, tituloBarraTotal, progressoTotal, tituloLabelTotal, tituloLabelAtual):
+        """        
+        Atualiza os contadores do arquivo atual e progresso total
+        """
+        
+        self.progressBarTotal.set_text(tituloBarraTotal)
+        self.progressBarTotal.set_fraction(progressoTotal)  # O processo deve ser entre 0.0 e 1.0
+        self.labelProgressTotal.set_text(tituloLabelTotal)
+        self.labelAtual.set_text(tituloLabelAtual)
 
         return False
 
-    def update_progess_arquivo(self, progresso_conversao):
-        # Atualiza o progress bar da conversão do arquivo
-        self.progress_bar_arquivo.set_fraction(progresso_conversao)  # O processo deve ser entre 0.0 e 1.0
+    def update_progess_arquivo(self, progressoConversao):
+        """
+        Atualiza o progress bar da conversão do arquivo
+        """
+        
+        self.progressbarAtual.set_fraction(progressoConversao)  # O processo deve ser entre 0.0 e 1.0
         return False
 
-    def copia_arquivos(self):
-        # Constante com os textos exibidos pelo ffmpeg
+    def processa_videos(self):
+        """
+        Efetua a conversão dos videos
+        """
+        
         DURATION = "Duration:"
         FRAME = "frame="
         TIME = "time="
 
         # Recupera o codec e o path do ffmpeg
-        codec_idx = get_app_settings("codec_video")
-        codec_idx = codec_idx if codec_idx is not None else "0"
-        codec_info = get_codec_info(CODECS_VIDEO[int(codec_idx)])
+        codecIdx = get_app_settings("codec_video")
+        codecIdx = codecIdx if codecIdx is not None else "0"
+        codecInfo = get_codec_info(CODECS_VIDEO[int(codecIdx)])
 
-        for arquivo in self.lista_arquivos:
+        for arquivo in self.listaArquivos:
             try:
 
                 if not os.path.isfile(arquivo):
@@ -112,56 +126,56 @@ class VideoEncodeProgressDialog(Gtk.Dialog):
                     self.failed = True
                     continue
 
-                self.completed_size = self.completed_size + os.stat(arquivo).st_size
-                novo_arquivo = self.dir_destino + os.sep + get_destino_arquivo(arquivo)
-                copia_arquivo = self.dir_destino + os.sep + os.path.basename(arquivo)
+                self.completedSize = self.completedSize + os.stat(arquivo).st_size
+                novoArquivo = self.dirDestino + os.sep + get_destino_arquivo(arquivo)
+                arquivoCopia = self.dirDestino + os.sep + os.path.basename(arquivo)
 
                 # Monta os parâmetros para a criação do novo video, de acordo com o codec escolhido
-                args = [get_caminho_ffmpeg(), "-hide_banner", "-i", copia_arquivo]
-                args.extend(codec_info["params"])
-                novo_arquivo = novo_arquivo[:novo_arquivo.rindex('.')] + codec_info["sufixo"]
-                args.append(novo_arquivo)
+                args = [get_caminho_ffmpeg(), "-hide_banner", "-i", arquivoCopia]
+                args.extend(codecInfo["params"])
+                novoArquivo = novoArquivo[:novoArquivo.rindex('.')] + codecInfo["sufixo"]
+                args.append(novoArquivo)
 
                 # Estatísticas da conversão total
-                titulo_barra_total = "[" + human_size(self.completed_size) + "/" + human_size(self.total) + "]"
-                titulo_label_total = "Original: " + os.path.basename(arquivo) + " (" + human_size(os.stat(arquivo).st_size) + ")"
+                tituloBarraTotal = "[" + to_human_size(self.completedSize) + "/" + to_human_size(self.total) + "]"
+                tituloLabelTotal = "Original: " + os.path.basename(arquivo) + " (" + to_human_size(os.stat(arquivo).st_size) + ")"
 
-                if os.path.isfile(novo_arquivo):
-                    titulo_label_atual = "Compactado: " + os.path.basename(novo_arquivo)
+                if os.path.isfile(novoArquivo):
+                    tituloLabelAtual = "Compactado: " + os.path.basename(novoArquivo)
                 else:
-                    titulo_label_atual = "Compactado: <Falha ao ler os dados do arquivo>"
+                    tituloLabelAtual = "Compactado: <Falha ao ler os dados do arquivo>"
 
-                progresso_total = self.completed_size / self.total  # Percentual do progresso
+                progressoTotal = self.completedSize / self.total  # Percentual do progresso
 
                 # Atualiza as estatíticas do total e o nome do arquivo de destino
-                GLib.idle_add(self.update_progess, titulo_barra_total, progresso_total, titulo_label_total, titulo_label_atual)
+                GLib.idle_add(self.update_progess, tituloBarraTotal, progressoTotal, tituloLabelTotal, tituloLabelAtual)
 
                 # Cria o diretório, se não existir
-                directory = os.path.dirname(novo_arquivo)
+                directory = os.path.dirname(novoArquivo)
                 if not os.path.exists(directory):
                     debug("Criando o diretório " + directory)
                     os.makedirs(directory)
 
                 # Verifica se o vídeo de destino existe
-                if os.path.isfile(novo_arquivo):
-                    debug("Removendo arquivo de destino existente: " + novo_arquivo)
-                    os.remove(novo_arquivo)
+                if os.path.isfile(novoArquivo):
+                    debug("Removendo arquivo de destino existente: " + novoArquivo)
+                    os.remove(novoArquivo)
 
-                max_secs = 0
-                cur_secs = 0
+                maxSecs = 0
+                curSecs = 0
 
                 # Checa se o usuário interrrompeu a conversão
-                if self.must_stop:
+                if self.mustStop:
                     return None
 
                 # Efetua a conversão do arquivo de video
                 debug("Executando aplicação: " + str(args))
 
-                global processo_ffmpeg
-                processo_ffmpeg = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, universal_newlines=True)
+                global gProcessoFfmpeg
+                gProcessoFfmpeg = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, universal_newlines=True)
 
                 # Inicia o processo e itera entre as linhas recebidas no stdout
-                for line in iter(processo_ffmpeg.stdout.readline, ''):
+                for line in iter(gProcessoFfmpeg.stdout.readline, ''):
                     if DURATION in line:
                         # Essa linha contém o tamanho total do vídeo
                         try:
@@ -169,7 +183,7 @@ class VideoEncodeProgressDialog(Gtk.Dialog):
                             tmp = tmp[tmp.find(" ") + 1:]
                             tmp = tmp[0: tmp.find(".")]
                             x = time.strptime(tmp, '%H:%M:%S')
-                            max_secs = datetime.timedelta(hours=x.tm_hour, minutes=x.tm_min, seconds=x.tm_sec).total_seconds()
+                            maxSecs = datetime.timedelta(hours=x.tm_hour, minutes=x.tm_min, seconds=x.tm_sec).total_seconds()
                         except ValueError:
                             debug("Falha ao converter o horário: " + tmp)
 
@@ -179,27 +193,27 @@ class VideoEncodeProgressDialog(Gtk.Dialog):
                             tmp = line[line.find(TIME):]
                             tmp = tmp[tmp.find("=") + 1: tmp.find(".")]
                             x = time.strptime(tmp, '%H:%M:%S')
-                            cur_secs = datetime.timedelta(hours=x.tm_hour, minutes=x.tm_min, seconds=x.tm_sec).total_seconds()
+                            curSecs = datetime.timedelta(hours=x.tm_hour, minutes=x.tm_min, seconds=x.tm_sec).total_seconds()
                         except ValueError:
                             debug("Falha ao converter o horário: " + tmp)
 
                     # Atualiza o progresso da conversão do arquivo de destino
-                    if cur_secs > 0 and max_secs > 0:
-                        GLib.idle_add(self.update_progess_arquivo, cur_secs / max_secs)
+                    if curSecs > 0 and maxSecs > 0:
+                        GLib.idle_add(self.update_progess_arquivo, curSecs / maxSecs)
 
                 # Finaliza o processo do ffmpeg
-                processo_ffmpeg.stdout.close()
-                processo_ffmpeg.wait()
+                gProcessoFfmpeg.stdout.close()
+                gProcessoFfmpeg.wait()
 
                 if os.path.isfile(arquivo):
-                    debug("Vídeo original: " + arquivo + " (" + human_size(os.stat(arquivo).st_size) + ")")
+                    debug("Vídeo original: " + arquivo + " (" + to_human_size(os.stat(arquivo).st_size) + ")")
 
-                if os.path.isfile(novo_arquivo):
-                    debug("Vídeo convertido: " + novo_arquivo + " (" + human_size(os.stat(novo_arquivo).st_size) + ")")
+                if os.path.isfile(novoArquivo):
+                    debug("Vídeo convertido: " + novoArquivo + " (" + to_human_size(os.stat(novoArquivo).st_size) + ")")
 
                 # Remove a cópia do video original
                 if 'True' == get_app_settings("remover_video_apos_conversao"):
-                    video_original = os.path.dirname(novo_arquivo) + os.sep + os.path.basename(arquivo)
+                    video_original = os.path.dirname(novoArquivo) + os.sep + os.path.basename(arquivo)
                     if os.path.isfile(video_original):
                         debug("Removendo a cópia do video original: " + video_original)
                         os.remove(video_original)
@@ -212,10 +226,14 @@ class VideoEncodeProgressDialog(Gtk.Dialog):
 
 
 class FileCopyProgressDialog(Gtk.Dialog):
-    must_stop = False
+    """
+    Dialog utilizada para exibir o progresso da cópia de arquivos
+    """
+    
+    mustStop = False
     failed = False
     total = 0
-    completed_size = 0
+    completedSize = 0
 
     def __init__(self, parent, arquivos, destino):
         Gtk.Dialog.__init__(self, "Copiando arquivos ", parent, 0,
@@ -223,8 +241,8 @@ class FileCopyProgressDialog(Gtk.Dialog):
 
         self.set_size_request(250, 150)
         self.set_border_width(10)
-        self.lista_arquivos = arquivos
-        self.dir_destino = destino
+        self.listaArquivos = arquivos
+        self.dirDestino = destino
 
         # Container principal
         grid = Gtk.Grid()
@@ -233,20 +251,20 @@ class FileCopyProgressDialog(Gtk.Dialog):
         grid.set_column_spacing(4)
         grid.set_row_spacing(6)
 
-        for arquivo in self.lista_arquivos:
+        for arquivo in self.listaArquivos:
             self.total = self.total + os.stat(arquivo).st_size
 
         # Label com o título da atividade
-        grid.attach(Gtk.Label(label="Efetuando a cópia de " + str(len(arquivos)) +
-                              " arquivos (" + human_size(self.total) + ")", halign=Gtk.Align.START), 0, 0, 6, 1)
+        grid.attach(Gtk.Label(label="Efetuando a cópia de " + str(len(arquivos)) + 
+                              " arquivos (" + to_human_size(self.total) + ")", halign=Gtk.Align.START), 0, 0, 6, 1)
 
         # Barra de progresso global
         self.progress_bar = Gtk.ProgressBar(show_text=True)
         grid.attach(self.progress_bar, 0, 1, 6, 1)
 
         # Label do progresso do arquivo
-        self.progress_label = Gtk.Label(halign=Gtk.Align.START)
-        grid.attach(self.progress_label, 0, 2, 6, 1)
+        self.labelProgress = Gtk.Label(halign=Gtk.Align.START)
+        grid.attach(self.labelProgress, 0, 2, 6, 1)
 
         self.get_content_area().pack_start(grid, True, True, 0)
         self.show_all()
@@ -255,42 +273,48 @@ class FileCopyProgressDialog(Gtk.Dialog):
         thread.daemon = True
         thread.start()
 
-    def update_progess(self, titulo_progresso, progresso_copia, titulo_copia):
-        self.progress_bar.set_fraction(progresso_copia)  # O processo deve ser entre 0.0 e 1.0
-        self.progress_bar.set_text(titulo_progresso)
-        self.progress_label.set_text(titulo_copia)
+    def update_progess(self, tituloProgresso, progressoCopia, tituloCopia):
+        """
+        Atualiza o progress bar da cópia dos arquivos 
+        """
+        self.progress_bar.set_fraction(progressoCopia)  # O processo deve ser entre 0.0 e 1.0
+        self.progress_bar.set_text(tituloProgresso)
+        self.labelProgress.set_text(tituloCopia)
         return False
 
     def copia_arquivos(self):
-        total_arquivos = len(self.lista_arquivos)
-        for i, arquivo in enumerate(self.lista_arquivos):
+        """
+        Efetua a cópia dos arquivos
+        """
+        totalArquivos = len(self.listaArquivos)
+        for i, arquivo in enumerate(self.listaArquivos):
             try:
-                self.completed_size = self.completed_size + os.stat(arquivo).st_size
+                self.completedSize = self.completedSize + os.stat(arquivo).st_size
 
-                titulo_progresso = "[" + human_size(self.completed_size) + "/" + human_size(self.total) + "]"
-                progresso_copia = self.completed_size / self.total  # Percentual do progresso
-                titulo_copia = "[" + str(i) + "/" + str(total_arquivos) + "] " + os.path.basename(arquivo) + " (" + human_size(os.stat(arquivo).st_size) + ")"
+                tituloProgresso = "[" + to_human_size(self.completedSize) + "/" + to_human_size(self.total) + "]"
+                progressoCopia = self.completedSize / self.total  # Percentual do progresso
+                tituloCopia = "[" + str(i) + "/" + str(totalArquivos) + "] " + os.path.basename(arquivo) + " (" + to_human_size(os.stat(arquivo).st_size) + ")"
 
-                GLib.idle_add(self.update_progess, titulo_progresso, progresso_copia, titulo_copia)
+                GLib.idle_add(self.update_progess, tituloProgresso, progressoCopia, tituloCopia)
 
                 # Verifica se a cópia foi interrompida
-                if self.must_stop:
+                if self.mustStop:
                     return None
 
                 # Cria o diretório, se não existir
-                novo_arquivo = self.dir_destino + os.sep + get_destino_arquivo(arquivo)
-                dir_novo_arquivo = os.path.dirname(novo_arquivo)
-                if not os.path.exists(dir_novo_arquivo):
+                novoArquivo = self.dirDestino + os.sep + get_destino_arquivo(arquivo)
+                dirNovoArquivo = os.path.dirname(novoArquivo)
+                if not os.path.exists(dirNovoArquivo):
                     try:
-                        debug("Criando o diretório " + dir_novo_arquivo)
-                        os.makedirs(dir_novo_arquivo)
+                        debug("Criando o diretório " + dirNovoArquivo)
+                        os.makedirs(dirNovoArquivo)
                     except Exception as e:
-                        debug("Falha ao criar o diretório de destino [" + dir_novo_arquivo + "]: " + str(e))
+                        debug("Falha ao criar o diretório de destino [" + dirNovoArquivo + "]: " + str(e))
                         continue
 
                 # Sempre copia o arquivo
-                debug("Copiando " + arquivo + " -> " + novo_arquivo)
-                shutil.copy2(arquivo, novo_arquivo)
+                debug("Copiando " + arquivo + " -> " + novoArquivo)
+                shutil.copy2(arquivo, novoArquivo)
 
                 # Se selecionado a opção, remover após a cópia
                 if 'True' == get_app_settings("remover_apos_copia"):
@@ -307,9 +331,12 @@ class FileCopyProgressDialog(Gtk.Dialog):
 
 
 class InputDialog(Gtk.Dialog):
-    # Dialog de solicitação de dados em um campo de texto ou combo
-    text_entry = None
-    item_combo = None
+    """
+    Dialog de solicitação de dados em um campo de texto ou combo
+    """
+    
+    textField = None
+    comboBox = None
 
     def __init__(self, parent, message, default, opcoes):
         Gtk.Dialog.__init__(self, "Solicitação de informação do usuário", parent, 0,
@@ -325,27 +352,27 @@ class InputDialog(Gtk.Dialog):
         debug("Solicitação de informção ao usuário: " + message)
         if opcoes is None:
             # Campo de texto
-            self.text_entry = Gtk.Entry()
-            self.text_entry.set_text(default)
-            topbox.pack_start(self.text_entry, True, True, 0)
+            self.textField = Gtk.Entry()
+            self.textField.set_text(default)
+            topbox.pack_start(self.textField, True, True, 0)
         else:
-            self.item_combo = Gtk.ComboBoxText()
+            self.comboBox = Gtk.ComboBoxText()
             # Campo de texto
             for i, word in enumerate(opcoes.split('|')):
-                self.item_combo.append_text(word)
+                self.comboBox.append_text(word)
                 if default and unicode(word) == unicode(default):
-                    self.item_combo.set_active(i)
+                    self.comboBox.set_active(i)
 
-            topbox.pack_start(self.item_combo, True, True, 0)
+            topbox.pack_start(self.comboBox, True, True, 0)
 
         self.get_content_area().pack_start(topbox, False, False, 0)
         self.show_all()
 
     def do_valida_campos(self):
-        if self.text_entry is not None and not self.text_entry.get_text().strip():
+        if self.textField is not None and not self.textField.get_text().strip():
             return show_message('Campo obrigatório não informado:', 'É necessário especificar o valor do campo.')
 
-        if self.item_combo is not None and not self.item_combo.get_active_text():
+        if self.comboBox is not None and not self.comboBox.get_active_text():
             return show_message('Campo obrigatório não informado:', 'É necessário selecionar um item.')
 
         return Gtk.ResponseType.OK
@@ -353,10 +380,10 @@ class InputDialog(Gtk.Dialog):
     def show_and_get_info(self):
         while self.run() == Gtk.ResponseType.OK:
             if self.do_valida_campos() is not None:
-                if self.text_entry is not None:
-                    resp = self.text_entry.get_text().strip()
+                if self.textField is not None:
+                    resp = self.textField.get_text().strip()
                 else:
-                    resp = self.item_combo.get_active_text()
+                    resp = self.comboBox.get_active_text()
                 self.destroy()
                 return resp
 
@@ -365,7 +392,10 @@ class InputDialog(Gtk.Dialog):
 
 
 class ConfigDialog(Gtk.Dialog):
-
+    """
+    Dialog de configuração da aplicação
+    """
+    
     def __init__(self, parent):
         Gtk.Dialog.__init__(self, "Configurações da aplicação", parent, 0,
                             (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
@@ -383,59 +413,67 @@ class ConfigDialog(Gtk.Dialog):
         gridCheck = Gtk.Grid()
 
         # Apenas fotos e videos
-        self.check_fotos_videos = Gtk.CheckButton("Copiar apenas as fotos e os vídeos")
-        self.check_fotos_videos.set_active('True' == get_app_settings("apenas_fotos_e_videos"))
-        gridCheck.attach(self.check_fotos_videos, 0, 0, 3, 1)
+        self.checkFotosVideos = Gtk.CheckButton("Copiar apenas as fotos e os vídeos")
+        self.checkFotosVideos.set_active('True' == get_app_settings("apenas_fotos_e_videos"))
+        gridCheck.attach(self.checkFotosVideos, 0, 0, 3, 1)
 
         # Sobrescrever
-        self.check_sobrescrever = Gtk.CheckButton("Sobrescrever os arquivos de destino")
-        self.check_sobrescrever.set_active('True' == get_app_settings("sobrescrever_arquivos"))
-        gridCheck.attach(self.check_sobrescrever, 4, 0, 3, 1)
+        self.checkSobrescrever = Gtk.CheckButton("Sobrescrever os arquivos de destino")
+        self.checkSobrescrever.set_active('True' == get_app_settings("sobrescrever_arquivos"))
+        gridCheck.attach(self.checkSobrescrever, 4, 0, 3, 1)
 
         # Remover após copia
-        self.check_remover_copia = Gtk.CheckButton("Remover os arquivos originais após a cópia")
-        self.check_remover_copia.set_active('True' == get_app_settings("remover_apos_copia"))
-        gridCheck.attach(self.check_remover_copia, 0, 1, 3, 1)
+        self.checkRemoverCopia = Gtk.CheckButton("Remover os arquivos originais após a cópia")
+        self.checkRemoverCopia.set_active('True' == get_app_settings("remover_apos_copia"))
+        gridCheck.attach(self.checkRemoverCopia, 0, 1, 3, 1)
 
+        # Exibir resolução dos arquivos
+        self.checkExibirResolucao = Gtk.CheckButton("Exibir a resolução dos arquivos")
+        self.checkExibirResolucao.set_active('True' == get_app_settings("exibir_resolucao_arquivos"))
+        gridCheck.attach(self.checkExibirResolucao, 4, 1, 3, 1)
+        
         # Comprimir videos
-        self.check_recode = Gtk.CheckButton("Re-codificar arquivos de vídeo")
-        self.check_recode.set_active('True' == get_app_settings("recodificar_videos"))
-        gridCheck.attach(self.check_recode, 0, 2, 3, 1)
+        self.checkRecode = Gtk.CheckButton("Re-codificar arquivos de vídeo")
+        self.checkRecode.set_active('True' == get_app_settings("recodificar_videos"))
+        gridCheck.attach(self.checkRecode, 0, 2, 3, 1)
 
         # Formato do video
         flowbox = Gtk.FlowBox()
 
         flowbox.add(Gtk.Label(label="Formato do vídeo:", halign=Gtk.Align.START))
-        self.combo_codec = Gtk.ComboBoxText()
+        self.comboCodecs = Gtk.ComboBoxText()
+        
         for codec in CODECS_VIDEO:
-            self.combo_codec.append_text(codec)
-        self.combo_codec.set_active(0)
-        self.combo_codec.set_entry_text_column(1)
+            self.comboCodecs.append_text(codec)
+            
+        self.comboCodecs.set_active(0)
+        self.comboCodecs.set_entry_text_column(1)
         codec_idx = get_app_settings("codec_video")
         if codec_idx is not None:
-            self.combo_codec.set_active(int(codec_idx))
-        flowbox.add(self.combo_codec)
+            self.comboCodecs.set_active(int(codec_idx))
+            
+        flowbox.add(self.comboCodecs)
 
         gridCheck.attach(flowbox, 4, 2, 3, 1)
 
         # Remover Videos convertidos
-        self.check_remover_video = Gtk.CheckButton("Remover a cópia do video original após a conversão")
-        self.check_remover_video.set_active('True' == get_app_settings("remover_video_apos_conversao"))
-        gridCheck.attach(self.check_remover_video, 0, 3, 3, 1)
+        self.checkRemoverVideo = Gtk.CheckButton("Remover a cópia do video original após a conversão")
+        self.checkRemoverVideo.set_active('True' == get_app_settings("remover_video_apos_conversao"))
+        gridCheck.attach(self.checkRemoverVideo, 0, 3, 3, 1)
 
         grid.attach(gridCheck, 0, 0, 6, 3)
 
         # Campo Destino
 
-        self.edit_ffmpeg = Gtk.Entry()
-        self.edit_ffmpeg.set_text(get_app_settings("caminho_ffmpeg"))
+        self.editCaminhoFfmpeg = Gtk.Entry()
+        self.editCaminhoFfmpeg.set_text(get_app_settings("caminho_ffmpeg"))
 
-        button = Gtk.Button.new_from_icon_name("fileopen", Gtk.IconSize.BUTTON)
+        button = Gtk.Button.new_from_icon_name("document-open", Gtk.IconSize.BUTTON)
         button.connect("clicked", self.do_click_seleciona_ffmpeg)
 
         boxDestino = Gtk.Box()
         boxDestino.pack_start(Gtk.Label(label="Caminho do ffmpeg:", halign=Gtk.Align.START), False, False, 0)
-        boxDestino.pack_start(self.edit_ffmpeg, True, True, 4)
+        boxDestino.pack_start(self.editCaminhoFfmpeg, True, True, 4)
         boxDestino.pack_end(button, False, False, 0)
 
         grid.attach(boxDestino, 0, 3, 6, 1)
@@ -445,13 +483,13 @@ class ConfigDialog(Gtk.Dialog):
         self.treeviewVideos = Gtk.TreeView(model=self.taskstoreVideos)
         self.treeviewVideos.append_column(Gtk.TreeViewColumn("Extensão dos arquivos de Video", Gtk.CellRendererText(), text=0))
 
-        scrollable_treelist_videos = Gtk.ScrolledWindow()
-        scrollable_treelist_videos.set_vexpand(True)
-        scrollable_treelist_videos.set_hexpand(True)
-        scrollable_treelist_videos.add(self.treeviewVideos)
+        scrollableTreelistVideos = Gtk.ScrolledWindow()
+        scrollableTreelistVideos.set_vexpand(True)
+        scrollableTreelistVideos.set_hexpand(True)
+        scrollableTreelistVideos.add(self.treeviewVideos)
 
         gridVideo = Gtk.Grid()
-        gridVideo.attach(scrollable_treelist_videos, 0, 0, 6, 6)
+        gridVideo.attach(scrollableTreelistVideos, 0, 0, 6, 6)
 
         for video in get_app_settings("extensoes_video").split('|'):
             self.taskstoreVideos.append([video])
@@ -475,13 +513,13 @@ class ConfigDialog(Gtk.Dialog):
         self.treeviewFotos = Gtk.TreeView(model=self.taskstoreFotos)
         self.treeviewFotos.append_column(Gtk.TreeViewColumn("Extensão dos arquivos de Foto", Gtk.CellRendererText(), text=0))
 
-        scrollable_treelist_fotos = Gtk.ScrolledWindow()
-        scrollable_treelist_fotos.set_vexpand(True)
-        scrollable_treelist_fotos.set_hexpand(True)
-        scrollable_treelist_fotos.add(self.treeviewFotos)
+        scrollableTreelistFotos = Gtk.ScrolledWindow()
+        scrollableTreelistFotos.set_vexpand(True)
+        scrollableTreelistFotos.set_hexpand(True)
+        scrollableTreelistFotos.add(self.treeviewFotos)
 
         gridFoto = Gtk.Grid()
-        gridFoto.attach(scrollable_treelist_fotos, 0, 0, 6, 6)
+        gridFoto.attach(scrollableTreelistFotos, 0, 0, 6, 6)
 
         for foto in get_app_settings("extensoes_foto").split('|'):
             self.taskstoreFotos.append([foto])
@@ -510,13 +548,13 @@ class ConfigDialog(Gtk.Dialog):
         dialog = Gtk.FileChooserDialog("Selecione o caminho do ffmpeg ", self, Gtk.FileChooserAction.OPEN,
                                        (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
 
-        caminho = self.edit_ffmpeg.get_text().strip()
+        caminho = self.editCaminhoFfmpeg.get_text().strip()
         if os.path.isfile(caminho):
             dialog.set_current_folder(caminho)
 
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
-            self.edit_ffmpeg.set_text(dialog.get_filename())
+            self.editCaminhoFfmpeg.set_text(dialog.get_filename())
             debug("Caminho do ffmpeg selecionado: " + dialog.get_filename())
 
         dialog.destroy()
@@ -534,7 +572,7 @@ class ConfigDialog(Gtk.Dialog):
         self.add_item("foto")
 
     def add_item(self, titulo):
-        info = InputDialog(win, 'Informe a extensão do arquivo de ' + titulo, '', None).show_and_get_info()
+        info = InputDialog(mainWindow, 'Informe a extensão do arquivo de ' + titulo, '', None).show_and_get_info()
         if info is not None:
             store = self.taskstoreVideos if titulo == "video" else self.taskstoreFotos
             store.append([info])
@@ -557,12 +595,13 @@ class ConfigDialog(Gtk.Dialog):
 
     def show_and_get_info(self):
         while self.run() == Gtk.ResponseType.OK:
-            set_app_settings("remover_apos_copia", str(self.check_remover_copia.get_active()))
-            set_app_settings("sobrescrever_arquivos", str(self.check_sobrescrever.get_active()))
-            set_app_settings("recodificar_videos", str(self.check_recode.get_active()))
-            set_app_settings("caminho_ffmpeg", self.edit_ffmpeg.get_text().strip())
-            set_app_settings("codec_video", str(self.combo_codec.get_active()))
-            set_app_settings("apenas_fotos_e_videos", str(self.check_fotos_videos.get_active()))
+            set_app_settings("remover_apos_copia", str(self.checkRemoverCopia.get_active()))
+            set_app_settings("sobrescrever_arquivos", str(self.checkSobrescrever.get_active()))
+            set_app_settings("recodificar_videos", str(self.checkRecode.get_active()))
+            set_app_settings("caminho_ffmpeg", self.editCaminhoFfmpeg.get_text().strip())
+            set_app_settings("codec_video", str(self.comboCodecs.get_active()))
+            set_app_settings("apenas_fotos_e_videos", str(self.checkFotosVideos.get_active()))
+            set_app_settings("exibir_resolucao_arquivos", str(self.checkExibirResolucao.get_active()))                 
 
             videos = ""
             for row in self.taskstoreVideos:
@@ -581,8 +620,10 @@ class ConfigDialog(Gtk.Dialog):
 
 
 class LogViewerDialog(Gtk.Dialog):
-    # Dialogo para exibição do log
-
+    """
+    Dialogo para exibição do log
+    """
+        
     def __init__(self, parent):
         Gtk.Dialog.__init__(self, "Log da aplicação", parent, 0, (Gtk.STOCK_OK, Gtk.ResponseType.OK))
 
@@ -612,6 +653,9 @@ class LogViewerDialog(Gtk.Dialog):
 
 
 class MapeamentoDialog(Gtk.Dialog):
+    """
+    Dialogo para mapeamento dos diretórios de destino
+    """
 
     def __init__(self, parent):
         Gtk.Dialog.__init__(self, "Mapeamento dos diretórios de destino", parent, 0, (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
@@ -631,10 +675,10 @@ class MapeamentoDialog(Gtk.Dialog):
         scrolledwindow.add(self.textview)
 
         # Carrega o mapeamento atual
-        global info_destino
+        global gDicMapeamentoDirDestino
         lines = ""
-        for key in sorted(info_destino.iterkeys()):
-            lines = lines + key + " => " + info_destino[key] + "\n"
+        for key in sorted(gDicMapeamentoDirDestino.iterkeys()):
+            lines = lines + key + " => " + gDicMapeamentoDirDestino[key] + "\n"
 
         self.textview.get_buffer().set_text(lines)
 
@@ -642,16 +686,16 @@ class MapeamentoDialog(Gtk.Dialog):
         self.show_all()
 
     def show_and_get_info(self):
-        global info_destino
+        global gDicMapeamentoDirDestino
         while self.run() == Gtk.ResponseType.OK:
             buf = self.textview.get_buffer()
             resp = buf.get_text(buf.get_start_iter(), buf.get_end_iter(), True)
             for line in resp.splitlines():
                 key = line[:line.find("=>")].strip()
                 value = line[line.find("=>") + 2:].strip()
-                info_destino[key] = value
+                gDicMapeamentoDirDestino[key] = value
 
-            print(str(info_destino))
+            print(str(gDicMapeamentoDirDestino))
             self.destroy()
             return None
 
@@ -660,11 +704,15 @@ class MapeamentoDialog(Gtk.Dialog):
 
 
 class MainWindow(Gtk.Window):
+    """
+    Janela principal da aplicação
+    """
+    
     colunas = ["Copiar", "Status", "Arquivo", "Destino", "Tipo", "Tamanho", "Detalhes"]
-    popup_menu = Gtk.Menu()
+    popupMenuTree = Gtk.Menu()
 
     def __init__(self):
-        Gtk.Window.__init__(self, title="Photo Sync - " + versao_aplicacao)
+        Gtk.Window.__init__(self, title="Photo Sync - " + VERSAO_APPLICACAO)
 
         self.set_icon_name("application-x-executable")
         Gtk.Settings().set_property('gtk_button_images', True)
@@ -686,57 +734,57 @@ class MainWindow(Gtk.Window):
 
         # Campo Origem
         grid.attach(Gtk.Label(label="Diretório de Origem:", halign=Gtk.Align.START), 0, 0, 1, 1)
-        self.edit_origem = Gtk.Entry()
-        self.edit_origem.set_activates_default(True)
-        self.edit_origem.set_text(get_app_settings("dir_origem"))
+        self.editOrigem = Gtk.Entry()
+        self.editOrigem.set_activates_default(True)
+        self.editOrigem.set_text(get_app_settings("dir_origem"))
 
-        grid.attach(self.edit_origem, 1, 0, 6, 1)
+        grid.attach(self.editOrigem, 1, 0, 6, 1)
 
         button = Gtk.Button.new_from_icon_name("folder-open", Gtk.IconSize.BUTTON)
         button.connect("clicked", self.do_click_origem)
         flowbox = Gtk.FlowBox()
         flowbox.add(button)
         grid.attach(flowbox, 7, 0, 1, 1)
-        self.label_status_from = Gtk.Label(label="", halign=Gtk.Align.START)
-        grid.attach(self.label_status_from, 0, 1, 8, 1)
+        self.labelStatusFrom = Gtk.Label(label="", halign=Gtk.Align.START)
+        grid.attach(self.labelStatusFrom, 0, 1, 8, 1)
 
         # Campo Destino
         grid.attach(Gtk.Label(label="Diretório de Destino:", halign=Gtk.Align.START), 0, 2, 1, 1)
-        self.edit_destino = Gtk.Entry()
-        self.edit_destino.set_text(get_app_settings("dir_destino"))
-        grid.attach(self.edit_destino, 1, 2, 6, 1)
+        self.editDestino = Gtk.Entry()
+        self.editDestino.set_text(get_app_settings("dir_destino"))
+        grid.attach(self.editDestino, 1, 2, 6, 1)
         button = Gtk.Button.new_from_icon_name("folder-open", Gtk.IconSize.BUTTON)
         button.connect("clicked", self.do_click_destino)
         flowbox = Gtk.FlowBox()
         flowbox.add(button)
 
         grid.attach(flowbox, 7, 2, 1, 1)
-        self.label_status_to = Gtk.Label(label="", halign=Gtk.Align.START)
-        grid.attach(self.label_status_to, 0, 3, 8, 1)
+        self.labelStatusTo = Gtk.Label(label="", halign=Gtk.Align.START)
+        grid.attach(self.labelStatusTo, 0, 3, 8, 1)
 
         # Barra de botões
 
         # Ler aquivos
-        self.button_ler_arquivos = create_icon_and_label_button("Atualizar", "reload")
-        self.button_ler_arquivos.connect("clicked", self.do_click_check_files)
-        grid.attach(self.button_ler_arquivos, 0, 4, 1, 1)
+        self.buttonLerArquivos = create_icon_and_label_button("Atualizar", "view-refresh")
+        self.buttonLerArquivos.connect("clicked", self.do_click_check_files)
+        grid.attach(self.buttonLerArquivos, 0, 4, 1, 1)
 
         # Sincronizar
-        self.button_sync_arquivos = create_icon_and_label_button("Sincronizar", "system-run")
-        self.button_sync_arquivos.set_sensitive(False)
-        self.button_sync_arquivos.connect("clicked", self.do_click_sync_files)
-        grid.attach(self.button_sync_arquivos, 1, 4, 1, 1)
+        self.buttonSyncArquivos = create_icon_and_label_button("Sincronizar", "system-run")
+        self.buttonSyncArquivos.set_sensitive(False)
+        self.buttonSyncArquivos.connect("clicked", self.do_click_sync_files)
+        grid.attach(self.buttonSyncArquivos, 1, 4, 1, 1)
 
         # Mapeamento
-        self.button_mapeamento = create_icon_and_label_button("Mapeamento", "document-properties")
-        self.button_mapeamento.set_sensitive(False)
-        self.button_mapeamento.connect("clicked", self.do_click_mapeamento_dir)
-        grid.attach(self.button_mapeamento, 2, 4, 1, 1)
+        self.buttonMapeamento = create_icon_and_label_button("Mapeamento", "document-properties")
+        self.buttonMapeamento.set_sensitive(False)
+        self.buttonMapeamento.connect("clicked", self.do_click_mapeamento_dir)
+        grid.attach(self.buttonMapeamento, 2, 4, 1, 1)
 
         # Configurações
-        self.button_config = create_icon_and_label_button("Configurações", "applications-system")
-        self.button_config.connect("clicked", self.do_click_config)
-        grid.attach(self.button_config, 3, 4, 1, 1)
+        self.buttonConfig = create_icon_and_label_button("Configurações", "applications-system")
+        self.buttonConfig.connect("clicked", self.do_click_config)
+        grid.attach(self.buttonConfig, 3, 4, 1, 1)
 
         # Logs
         button = create_icon_and_label_button("Logs", "system-search")
@@ -775,44 +823,44 @@ class MainWindow(Gtk.Window):
             column = Gtk.TreeViewColumn(column_title, cellRenderer, text=i)
             if i > 1:  # Colunas 0 e 1 são do checkbox e icon e foram adicionadas anteriormente
                 self.treeview.append_column(column)
-            self.store.set_sort_func(i, compare, None)
+            self.store.set_sort_func(i, compareTreeItem, None)
             column.set_sort_column_id(i)
 
         self.treeview.connect("row-activated", self.on_tree_double_clicked)
 
         # Adiciona o treeview a um scrollwindow
-        scrollable_treelist = Gtk.ScrolledWindow()
-        scrollable_treelist.set_vexpand(True)
-        scrollable_treelist.add(self.treeview)
-        grid.attach(scrollable_treelist, 0, 5, 8, 8)
+        scrollableTreelist = Gtk.ScrolledWindow()
+        scrollableTreelist.set_vexpand(True)
+        scrollableTreelist.add(self.treeview)
+        grid.attach(scrollableTreelist, 0, 5, 8, 8)
 
         # Label de seleção dos arquivos
-        self.label_status_copia = Gtk.Label(label="", halign=Gtk.Align.START)
-        grid.attach(self.label_status_copia, 0, 13, 8, 1)
+        self.labelStatusCopia = Gtk.Label(label="", halign=Gtk.Align.START)
+        grid.attach(self.labelStatusCopia, 0, 13, 8, 1)
 
         self.add(grid)
 
         i0 = Gtk.MenuItem("Desmarcar todos os arquivos")
         i0.connect("activate", self.do_desmarcar_todos)
-        self.popup_menu.append(i0)
+        self.popupMenuTree.append(i0)
         i1 = Gtk.MenuItem("Marcar todos os videos")
         i1.connect("activate", self.do_marca_todos_videos)
-        self.popup_menu.append(i1)
+        self.popupMenuTree.append(i1)
         i2 = Gtk.MenuItem("Marcar todas as fotos")
         i2.connect("activate", self.do_marca_todas_fotos)
-        self.popup_menu.append(i2)
+        self.popupMenuTree.append(i2)
         i3 = Gtk.MenuItem("Marcar videos não H265")
         i3.connect("activate", self.do_marcar_nao_h265)
-        self.popup_menu.append(i3)
+        self.popupMenuTree.append(i3)
         i4 = Gtk.MenuItem("Apagar arquivos marcados")
         i4.connect("activate", self.do_apagar_selecionados)
-        self.popup_menu.append(i4)
+        self.popupMenuTree.append(i4)
 
-        self.popup_menu.show_all()
+        self.popupMenuTree.show_all()
 
     def do_show_popup(self, tv, event):  # @UnusedVariable
         if event.button == 3:
-            self.popup_menu.popup(None, None, None, None, 0, Gtk.get_current_event_time())
+            self.popupMenuTree.popup(None, None, None, None, 0, Gtk.get_current_event_time())
 
     def do_apagar_selecionados(self, widget):  # @UnusedVariable
         debug("MenuItem: Apagar arquivos marcados")
@@ -866,7 +914,7 @@ class MainWindow(Gtk.Window):
     def do_seleciona_dir(self, titulo):
         debug("Selecionando diretório de " + titulo)
 
-        editor = self.edit_origem if titulo == "origem" else self.edit_destino
+        editor = self.editOrigem if titulo == "origem" else self.editDestino
 
         dialog = Gtk.FileChooserDialog("Selecione o diretório de " + titulo, self, Gtk.FileChooserAction.SELECT_FOLDER,
                                        (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
@@ -892,8 +940,8 @@ class MainWindow(Gtk.Window):
         return tipo
 
     def get_file_is_sync(self, arquivo):
-        global arquivos_destino
-        arquivos = arquivos_destino.get(os.path.basename(arquivo), [])
+        global gListaArquivosDestino
+        arquivos = gListaArquivosDestino.get(os.path.basename(arquivo), [])
         tamanhoOrigem = os.stat(arquivo).st_size
         found = False
         if len(arquivos) > 0:
@@ -912,25 +960,25 @@ class MainWindow(Gtk.Window):
         return resp
 
     def do_monta_lista_arquivos(self):
-        active = origem_pronto and destino_pronto
+        active = gLeituraOrigemFinalizada and gLeituraDestinoFinalizada
 
         if active:
             debug("Populando a grid de arquivos")
 
-            global arquivos_origem
-            global info_origem
-            global info_destino
+            global gListaArquivosOrigem
+            global gDicInfoArquivosOrigem
+            global gDicMapeamentoDirDestino
 
             # Verifica se deve sobrescrever os arqivos existentes
             sobrescrever = 'True' == get_app_settings("sobrescrever_arquivos")
 
             self.store.clear()
-            posSrc = len(self.edit_origem.get_text()) + 1
-            for arquivo in arquivos_origem:
+            posSrc = len(self.editOrigem.get_text()) + 1
+            for arquivo in gListaArquivosOrigem:
                 sync = self.get_file_is_sync(arquivo)
                 icon = self.get_icone_arquivo(sync)
-                tamanho = human_size(os.stat(arquivo).st_size)
-                detalhes = info_origem[arquivo]
+                tamanho = to_human_size(os.stat(arquivo).st_size)
+                detalhes = gDicInfoArquivosOrigem[arquivo]
                 arquivoAbr = arquivo[posSrc:]
                 tipoArquivo = self.get_tipo_arquivo(arquivo)
                 destino = get_destino_arquivo(arquivo)
@@ -939,7 +987,7 @@ class MainWindow(Gtk.Window):
                 if sobrescrever:
                     sync = False
 
-                self.store.insert(0, [
+                self.store.append([
                     not sync,
                     icon,
                     arquivoAbr,
@@ -950,85 +998,85 @@ class MainWindow(Gtk.Window):
                 ])
 
             # Habilita os botões
-            self.button_ler_arquivos.set_sensitive(active)
-            self.button_sync_arquivos.set_sensitive(active)
-            self.button_mapeamento.set_sensitive(active)
+            self.buttonLerArquivos.set_sensitive(active)
+            self.buttonSyncArquivos.set_sensitive(active)
+            self.buttonMapeamento.set_sensitive(active)
 
             # Atualiza o contador
             self.do_atualiza_contador_selecao()
             debug("Grid de arquivos populada")
 
     def do_read_file_list_origem(self):
-        global arquivos_origem
-        global origem_pronto
-        global info_origem
-        info_origem = {}
+        global gListaArquivosOrigem
+        global gLeituraOrigemFinalizada
+        global gDicInfoArquivosOrigem
+        gDicInfoArquivosOrigem = {}
 
         # Monta a lista de arquivos
-        arquivos_origem = [y for x in os.walk(self.edit_origem.get_text()) for y in glob(os.path.join(x[0], '*.*'))]
+        gListaArquivosOrigem = [y for x in os.walk(self.editOrigem.get_text()) for y in glob(os.path.join(x[0], '*.*'))]
         tamanho = 0
-        for arquivo in arquivos_origem:
+        for arquivo in gListaArquivosOrigem:
             try:
                 # Carrega a informação do arquivo
-                info_origem[arquivo] = self.get_file_info(arquivo)
+                gDicInfoArquivosOrigem[arquivo] = self.get_file_info(arquivo)
 
                 tamanho = tamanho + os.stat(arquivo).st_size  # in bytes
             except:
                 debug("Falha ao ler o arquivo de origem " + arquivo)
 
-        self.label_status_from.set_text("Arquivos no diretório de origem: " + str(len(arquivos_origem)) + " (" + human_size(tamanho) + ")")
-        debug(self.label_status_from.get_text())
-        origem_pronto = True
+        self.labelStatusFrom.set_text("Arquivos no diretório de origem: " + str(len(gListaArquivosOrigem)) + " (" + to_human_size(tamanho) + ")")
+        debug(self.labelStatusFrom.get_text())
+        gLeituraOrigemFinalizada = True
         self.do_monta_lista_arquivos()
         debug("Consulta da lista de arquivos de origem concluída")
 
     def do_read_file_list_destino(self):
-        global destino_pronto
-        global arquivos_destino
-        arquivos_destino = {}
-        lista_arquivos_destino = [y for x in os.walk(self.edit_destino.get_text()) for y in glob(os.path.join(x[0], '*.*'))]
+        global gLeituraDestinoFinalizada
+        global gListaArquivosDestino
+        gListaArquivosDestino = {}
+        lista_arquivos_destino = [y for x in os.walk(self.editDestino.get_text()) for y in glob(os.path.join(x[0], '*.*'))]
         tamanho = 0
         for arquivo in lista_arquivos_destino:
             try:
                 tamanho = tamanho + os.stat(arquivo).st_size  # in bytes
                 nome = os.path.basename(arquivo)
-                arquivos = arquivos_destino.get(nome, [])
+                arquivos = gListaArquivosDestino.get(nome, [])
                 arquivos.append(arquivo)
-                arquivos_destino[nome] = arquivos
+                gListaArquivosDestino[nome] = arquivos
             except:
                 debug("Falha ao ler o arquivo de destino " + arquivo)
 
-        self.label_status_to.set_text("Arquivos no diretório de destino: " + str(len(lista_arquivos_destino)) + " (" + human_size(tamanho) + ")")
-        debug(self.label_status_to.get_text())
-        destino_pronto = True
+        self.labelStatusTo.set_text("Arquivos no diretório de destino: " + str(len(lista_arquivos_destino)) + " (" + to_human_size(tamanho) + ")")
+        debug(self.labelStatusTo.get_text())
+        gLeituraDestinoFinalizada = True
         self.do_monta_lista_arquivos()
         debug("Consulta da lista de arquivos de destino concluída")
 
     def do_click_check_files(self, widget):  # @UnusedVariable
         debug("Validando os diretórios")
 
-        if not os.path.isdir(self.edit_origem.get_text()):
+        if not os.path.isdir(self.editOrigem.get_text()):
             return show_message("Diretório inexistente", "Não foi possível encontrar o diretório de origem.")
 
-        if not os.path.isdir(self.edit_destino.get_text()):
+        if not os.path.isdir(self.editDestino.get_text()):
             return show_message("Diretório inexistente", "Não foi possível encontrar o diretório de destino.")
 
         debug("Verificando a lista de arquivos")
 
-        global arquivos_origem
-        global arquivos_destino
-        global origem_pronto
-        global destino_pronto
+        global gListaArquivosOrigem
+        global gListaArquivosDestino
+        global gLeituraOrigemFinalizada
+        global gLeituraDestinoFinalizada
 
-        arquivos_origem = []
-        arquivos_destino = {}
-        origem_pronto = False
-        destino_pronto = False
+        gListaArquivosOrigem = []
+        gListaArquivosDestino = {}
+        gLeituraOrigemFinalizada = False
+        gLeituraDestinoFinalizada = False
 
         # Desabilita os botões
-        self.button_ler_arquivos.set_sensitive(False)
-        self.button_sync_arquivos.set_sensitive(False)
-        self.button_mapeamento.set_sensitive(False)
+        self.buttonLerArquivos.set_sensitive(False)
+        self.buttonSyncArquivos.set_sensitive(False)
+        self.buttonMapeamento.set_sensitive(False)
 
         self.store.clear()
 
@@ -1051,7 +1099,7 @@ class MainWindow(Gtk.Window):
 
         for row in self.store:
             if row[0]:
-                arquivo = self.edit_origem.get_text() + os.sep + row[2]
+                arquivo = self.editOrigem.get_text() + os.sep + row[2]
                 cont += 1
                 size += os.stat(arquivo).st_size
 
@@ -1065,14 +1113,14 @@ class MainWindow(Gtk.Window):
                     cont_outro += 1
                     size_outro += os.stat(arquivo).st_size
 
-        self.label_status_copia.set_text("Arquivos selecionados: " + str(cont) + " / " + str(len(self.store)) + " (" + human_size(size) + ") - Videos: " +
-                                         str(cont_video) + " (" + human_size(size_video) + ") - Fotos: " + str(cont_foto) + " (" + human_size(size_foto) + ") - Outros: " + str(cont_outro) + "(" + human_size(size_outro) + ")")
+        self.labelStatusCopia.set_text("Arquivos selecionados: " + str(cont) + " / " + str(len(self.store)) + " (" + to_human_size(size) + ") - Videos: " + 
+                                         str(cont_video) + " (" + to_human_size(size_video) + ") - Fotos: " + str(cont_foto) + " (" + to_human_size(size_foto) + ") - Outros: " + str(cont_outro) + "(" + to_human_size(size_outro) + ")")
 
     def do_monta_lista_arquivos_copiar(self):
         resp = []
         for row in self.store:
             if row[0]:
-                resp.append(self.edit_origem.get_text() + os.sep + row[2])
+                resp.append(self.editOrigem.get_text() + os.sep + row[2])
         return resp
 
     def is_video(self, arquivo):
@@ -1104,7 +1152,7 @@ class MainWindow(Gtk.Window):
     def do_click_mapeamento_dir(self, widget):  # @UnusedVariable
         debug("Mapeamento de diretórios")
 
-        MapeamentoDialog(win).show_and_get_info()
+        MapeamentoDialog(mainWindow).show_and_get_info()
         self.do_monta_lista_arquivos()
 
     def do_click_sync_files(self, widget):  # @UnusedVariable
@@ -1122,9 +1170,9 @@ class MainWindow(Gtk.Window):
 
         debug("Iniciando a cópia dos arquivos")
         # Efetua a cópia dos arquivos
-        dialogArquivos = FileCopyProgressDialog(win, arquivos, self.edit_destino.get_text())
+        dialogArquivos = FileCopyProgressDialog(mainWindow, arquivos, self.editDestino.get_text())
         dialogArquivos.run()
-        dialogArquivos.must_stop = True
+        dialogArquivos.mustStop = True
         if dialogArquivos.failed:
             show_message("Falha na cópia dos arquivos!", "Ocorreram falhas durante a cópia de pelo menos um arquivo, verifique o log para mais informações.")
 
@@ -1142,17 +1190,17 @@ class MainWindow(Gtk.Window):
                 savedStdout = sys.stdout
 
                 # Efetua a cópia dos arquivos
-                dialogVideo = VideoEncodeProgressDialog(win, arquivos, self.edit_destino.get_text(),)
+                dialogVideo = VideoEncodeProgressDialog(mainWindow, arquivos, self.editDestino.get_text(),)
                 dialogVideo.run()
                 # Força a interrupção da conversão caso o usuário pressione cancel
-                dialogVideo.must_stop = True
+                dialogVideo.mustStop = True
                 if dialogVideo.failed:
                     show_message("Falha na conversão!", "Ocorreram falhas durante a conversão de pelo menos uma video, verifique o log para mais informações.")
 
-                global processo_ffmpeg
-                if processo_ffmpeg is not None:
+                global gProcessoFfmpeg
+                if gProcessoFfmpeg is not None:
                     try:
-                        processo_ffmpeg.kill()
+                        gProcessoFfmpeg.kill()
                         debug("O processo do ffmpeg foi interrompido pelo usuário.")
                     except OSError:
                         debug("O processo do ffmpeg foi finalizado com sucesso.")
@@ -1167,11 +1215,11 @@ class MainWindow(Gtk.Window):
 
     def do_click_config(self, widget):  # @UnusedVariable
         debug("Configurando a aplicação")
-        ConfigDialog(win).show_and_get_info()
+        ConfigDialog(mainWindow).show_and_get_info()
 
     def do_click_logs(self, widget):  # @UnusedVariable
         debug("Visualizando os logs")
-        LogViewerDialog(win).show_and_get_info()
+        LogViewerDialog(mainWindow).show_and_get_info()
 
     def do_click_close(self, widget):  # @UnusedVariable
         on_close(None, None)
@@ -1184,18 +1232,21 @@ class MainWindow(Gtk.Window):
         self.do_atualiza_contador_selecao()
 
     def get_file_info(self, arquivo):
-        if not self.is_foto(arquivo) and not self.is_video(arquivo):
+    
+        captureInfo = 'True' == get_app_settings("exibir_resolucao_arquivos")
+    
+        if not captureInfo or not self.is_foto(arquivo) and not self.is_video(arquivo):
             return ""
 
         pattern = re.compile("(Duration: [0-9]{2,}:[0-9]{2,}:[0-9]{2,})|(Video: [^\s]+)|([0-9]{2,}x[0-9]{2,})|([0-9|.]+ fps)|(Audio: [^\s]+)|([0-9]+ Hz)")
         args = [get_caminho_ffmpeg(), "-hide_banner", "-i", arquivo]
 
-        global processo_ffmpeg
-        processo_ffmpeg = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, universal_newlines=True)
+        global gProcessoFfmpeg
+        gProcessoFfmpeg = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, universal_newlines=True)
 
         lines = ""
         # Inicia o processo e concatena as linhas do output
-        for line in iter(processo_ffmpeg.stdout.readline, ''):
+        for line in iter(gProcessoFfmpeg.stdout.readline, ''):
 
             # Considera apenas as linhas essenciais
             if line.find("Stream #0") or line.find(" Duration:"):
@@ -1211,16 +1262,16 @@ class MainWindow(Gtk.Window):
             resp = resp + m.group() + " "
 
         # Finaliza o processo do ffmpeg
-        processo_ffmpeg.stdout.close()
-        processo_ffmpeg.wait()
+        gProcessoFfmpeg.stdout.close()
+        gProcessoFfmpeg.wait()
 
         return resp
 
 
 def get_destino_arquivo(arquivo):
-    global info_destino
-    if info_destino is None:
-        info_destino = {}
+    global gDicMapeamentoDirDestino
+    if gDicMapeamentoDirDestino is None:
+        gDicMapeamentoDirDestino = {}
 
     nome = os.path.basename(arquivo)
     data = datetime.datetime.fromtimestamp(os.path.getmtime(arquivo))
@@ -1228,13 +1279,17 @@ def get_destino_arquivo(arquivo):
     # Destino: /YYYY/yyyy-MM-dd/arquivo
     destino = str(data.year) + os.sep + str(data.year) + "-" + str(data.month).zfill(2) + "-" + str(data.day).zfill(2)
 
-    if destino not in info_destino:
-        info_destino[destino] = destino
+    if destino not in gDicMapeamentoDirDestino:
+        gDicMapeamentoDirDestino[destino] = destino
 
-    return info_destino[destino] + os.sep + nome
+    return gDicMapeamentoDirDestino[destino] + os.sep + nome
 
 
 def create_icon_and_label_button(label, icon):
+    """
+    Cria um botão com um ícone e um texto
+    """
+    
     debug("Criando botão: " + label)
     button = Gtk.Button.new()
     bGrid = Gtk.Grid()
@@ -1246,7 +1301,11 @@ def create_icon_and_label_button(label, icon):
     return button
 
 
-def compare(model, row1, row2, user_data):  # @UnusedVariable
+def compareTreeItem(model, row1, row2, user_data):  # @UnusedVariable
+    """
+    Compara 2 ítens de uma tree
+    """
+    
     sort_column, _ = model.get_sort_column_id()
     value1 = model.get_value(row1, sort_column)
     value2 = model.get_value(row2, sort_column)
@@ -1260,10 +1319,13 @@ def compare(model, row1, row2, user_data):  # @UnusedVariable
 
 
 def show_message(titulo, msg):
+    """
+    Exibe um Dialog de aviso
+    """
+
     debug("Exibindo dialog: " + titulo + " - " + msg)
-    # Exibe um Dialog de aviso
-    global win
-    dialog = Gtk.MessageDialog(win, 0, Gtk.MessageType.INFO, Gtk.ButtonsType.CLOSE, titulo)
+    global mainWindow
+    dialog = Gtk.MessageDialog(mainWindow, 0, Gtk.MessageType.INFO, Gtk.ButtonsType.CLOSE, titulo)
     dialog.format_secondary_text(msg)
     dialog.run()
     dialog.destroy()
@@ -1271,6 +1333,10 @@ def show_message(titulo, msg):
 
 
 def indent_xml(elem, level=0):
+    """
+    Formata um arquivo XML
+    """
+    
     i = "\n" + level * "\t"
     if len(elem):
         if not elem.text or not elem.text.strip():
@@ -1287,43 +1353,62 @@ def indent_xml(elem, level=0):
 
 
 def set_app_settings(xmlTag, value):
+    """
+    Salva uma configuração da aplicação
+    """
+
     debug("Salvando configuração da aplicação: " + xmlTag + " = " + value)
     if not os.path.isfile(ARQUIVO_XML_SETTINGS):
         indent_and_save_xml(ET.Element('config'), ARQUIVO_XML_SETTINGS)
 
-    config_tree = ET.parse(ARQUIVO_XML_SETTINGS, ET.XMLParser(remove_comments=False, strip_cdata=False))
-    root = config_tree.getroot()
+    configTree = ET.parse(ARQUIVO_XML_SETTINGS, ET.XMLParser(remove_comments=False, strip_cdata=False))
+    root = configTree.getroot()
 
     # Remove o nó se já existir
-    if config_tree.find("./" + xmlTag) is not None:
-        root.remove(config_tree.find("./" + xmlTag))
+    if configTree.find("./" + xmlTag) is not None:
+        root.remove(configTree.find("./" + xmlTag))
 
     # Se o valor não for nulo, adicionar o novo nó
     if value is not None and value.strip():
         ET.SubElement(root, xmlTag).text = value
 
-    indent_and_save_xml(config_tree.getroot(), ARQUIVO_XML_SETTINGS)
+    indent_and_save_xml(configTree.getroot(), ARQUIVO_XML_SETTINGS)
 
 
 def get_app_settings(xmlTag):
-    node_caminho = ET.parse(ARQUIVO_XML_SETTINGS, ET.XMLParser(remove_comments=False, strip_cdata=False)).find("./" + xmlTag)
-    return None if node_caminho is None else node_caminho.text
+    """
+    Recupera uma configuração da aplicação
+    """
+    
+    nodeCaminho = ET.parse(ARQUIVO_XML_SETTINGS, ET.XMLParser(remove_comments=False, strip_cdata=False)).find("./" + xmlTag)
+    return None if nodeCaminho is None else nodeCaminho.text
 
 
-def indent_and_save_xml(root_node, arquivo_xml):
-    debug("Salvando o arquivo XML: " + arquivo_xml)
-    indent_xml(root_node)
-    pretty_xml = ET.tostring(root_node, encoding="UTF-8", method="xml", xml_declaration=True)
-    arquivo = open(arquivo_xml, "wb")
-    arquivo.write(pretty_xml)
+def indent_and_save_xml(rootNode, arquivoXml):
+    """
+    Formata e salva um arquivo XML
+    """
+
+    debug("Salvando o arquivo XML: " + arquivoXml)
+    indent_xml(rootNode)
+    prettyXml = ET.tostring(rootNode, encoding="UTF-8", method="xml", xml_declaration=True)
+    arquivo = open(arquivoXml, "wb")
+    arquivo.write(prettyXml)
     arquivo.close()
 
 
 def debug(msg=''):
-    logger.debug(str(msg).strip())
+    """
+    Loga uma mensagem
+    """
+    gLogger.debug(str(msg).strip())
 
 
-def human_size(nbytes):
+def to_human_size(nbytes):
+    """
+    Converte uma quantidade de bytes em formato de fácil visualização
+    """
+    
     human = nbytes
     rank = 0
     if nbytes != 0:
@@ -1334,15 +1419,21 @@ def human_size(nbytes):
     return '%s %s' % (f, UNIDADES[rank])
 
 
-# Fecha a aplicação, liberando o FileHandler do log
 def on_close(self, widget):  # @UnusedVariable
+    """
+    Fecha a aplicação, liberando o FileHandler do log
+    """
+    
     logHandler.close()
-    logger.removeHandler(logHandler)
+    gLogger.removeHandler(logHandler)
     sys.exit()
 
 
 def get_codec_info(codec):
-    # Recupera os parâmtros do ffmpeg para conversão
+    """
+    Recupera os parâmtros do ffmpeg para conversão
+    """
+
     resp = None
     if VIDEO_H265 == codec:
         resp = {"params":["-c:v", "libx265", "-acodec", "aac", "-strict", "-2"], "sufixo":"_H265.mp4"}
@@ -1356,100 +1447,49 @@ def get_codec_info(codec):
 
 
 def get_caminho_ffmpeg():
+    """
+    Recupera o caminho onde o ffmpeg está instalado
+    """
+    
     app = get_app_settings("caminho_ffmpeg")
     return app if app is not None else "ffmpeg"
 
 
 def get_ffmpeg_features():
-    global ffmpeg_features
+    
+    """
+    Recupera uma lista com as features do ffmpeg: Ex: --enable-libx264
+    """
+    global gListaFfmpegFeatures
 
-    if ffmpeg_features is None:
-        processo_ffmpeg = subprocess.Popen([get_caminho_ffmpeg()], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, universal_newlines=True)
+    if gListaFfmpegFeatures is None:
+        gProcessoFfmpeg = subprocess.Popen([get_caminho_ffmpeg()], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, universal_newlines=True)
 
         linhas = ""
-        for line in iter(processo_ffmpeg.stdout.readline, ''):
+        for line in iter(gProcessoFfmpeg.stdout.readline, ''):
             if "--" in line:
                 linhas = linhas + line
 
-        processo_ffmpeg.stdout.close()
-        processo_ffmpeg.wait()
+        gProcessoFfmpeg.stdout.close()
+        gProcessoFfmpeg.wait()
 
-        ffmpeg_features = []
+        gListaFfmpegFeatures = []
         pattern = re.compile("--enable-[^\s]+|disable-[^\s]+")
         for m in pattern.finditer(linhas):
-            ffmpeg_features.append(m.group())
+            gListaFfmpegFeatures.append(m.group())
 
-    return ffmpeg_features
-
-
-ffmpeg_features = None
-
+    return gListaFfmpegFeatures
 
 # Constantes da aplicação
-UNIDADES = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
-DIR_APPLICATION = os.path.dirname(os.path.realpath(__file__))
-ARQUIVO_XML_SETTINGS = DIR_APPLICATION + os.sep + "settings.xml"
-ARQUIVO_LOG = DIR_APPLICATION + os.sep + "application.log"
 
-show_debug_msg = False  # True para exibir mensagens de debug
-versao_aplicacao = "v1.0"
-origem_pronto = False
-destino_pronto = False
-arquivos_origem = None
-info_origem = None
-info_destino = {}
-arquivos_destino = None
-processo_ffmpeg = None
 
-# Remove o arquivo de log anterior e cria o logger
-if os.path.isfile(ARQUIVO_LOG):
-    os.remove(ARQUIVO_LOG)
+VERSAO_APPLICACAO = "v1.0"  #  Versão da aplicação
 
-FORMAT = '%(asctime)-15s %(message)s'
-logging.basicConfig(level=logging.DEBUG, format=FORMAT)
-logger = logging.getLogger('-')
 
-logHandler = logging.FileHandler(ARQUIVO_LOG)
-logger.addHandler(logHandler)
-
-# Lê os parâmetros da aplicação
-try:
-    opts, args = getopt.getopt(sys.argv[1:], "h", [])
-except getopt.GetoptError:
-    print('pysync.py -h (help)')
-    sys.exit(2)
-for opt, arg in opts:
-    if opt == '-h':
-        print("\nPrograma para sincronização de arquivos")
-        print("\nUso: pysync.py -h (help)")
-        print("\nExemplo: ./pysync.py")
-        sys.exit()
-
-# Força UTF-8 por padrão
-if sys.version_info < (3, 0):
-    reload(sys)
-    sys.setdefaultencoding("utf-8")
-
-if not os.path.isfile(ARQUIVO_XML_SETTINGS):
-    set_app_settings("dir_destino", str(os.path.expanduser('~')))
-    set_app_settings("dir_origem", str(os.path.expanduser('~')))
-    set_app_settings("extensoes_video", "wmv|avi|mpg|3gp|mov|m4v|mts|mp4")
-    set_app_settings("extensoes_foto", "dof|arw|raw|jpg|jpeg|png|nef")
-    set_app_settings("codec_video", "0")
-    set_app_settings("caminho_ffmpeg", "ffmpeg")
-
-win = MainWindow()
-
-# Verifica a presença do ffmpeg
-if not spawn.find_executable(get_caminho_ffmpeg()):
-    info = InputDialog(win, 'Informe o caminho para o ffmpeg', '', None).show_and_get_info()
-    if info is None or not spawn.find_executable(info):
-        print("Não foi possível encontrar o aplicativo necessário ffmpeg.")
-        print("Verifique a configuração do caminho do ffmpeg no arquivo settings.xml")
-        print("A configuração atual é: " + get_caminho_ffmpeg())
-        sys.exit(2)
-    else:
-        set_app_settings("caminho_ffmpeg",info)
+UNIDADES = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']  # Unidades de conversão bytes -> Si
+DIR_APPLICATION = os.path.dirname(os.path.realpath(__file__))  # Diretório da aplicação
+ARQUIVO_XML_SETTINGS = DIR_APPLICATION + os.sep + "settings.xml"  # Arquivo de configuração da aplicação
+ARQUIVO_LOG = DIR_APPLICATION + os.sep + "application.log"  # Arquivo de log
 
 # Codecs de Video
 VIDEO_H265 = "Video H265"
@@ -1458,6 +1498,75 @@ VIDEO_VP8 = "Video VP8"
 VIDEO_VP9 = "Video VP9"
 CODECS_VIDEO = []
 
+# Variáveis globais da aplicação
+# Nota: por convenção, as variáveis globais são camelCase e iniciam com um 'g' 
+
+gDebugMode = False  # True para exibir mensagens de debug
+
+# Controle do ffmpeg
+gProcessoFfmpeg = None  # Representa a instância do processo do ffmpeg
+gListaFfmpegFeatures = None  # Dicionário com as features de compilação do ffmpeg
+
+# Variáveis dos arquivos de origem
+gLeituraOrigemFinalizada = False  # Sinaliza o fim da thread de leitura de arquivos de origem 
+gListaArquivosOrigem = None  # Lista de arquivos no diretório de origem
+gDicInfoArquivosOrigem = None  # Dicionário com informações sobre os arquivos
+
+# Variáveis dos arquivos de destino
+gLeituraDestinoFinalizada = False  # Sinaliza o fim da thread de leitura de arquivos de destino
+gListaArquivosDestino = None  # Lista de arquivos no diretório de destino
+gDicMapeamentoDirDestino = {}  # Mapeamento dos diretórios de destino
+
+# Remove o arquivo de log anterior e cria o gLogger
+if os.path.isfile(ARQUIVO_LOG):
+    os.remove(ARQUIVO_LOG)
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)-15s %(message)s')
+logHandler = logging.FileHandler(ARQUIVO_LOG)
+
+gLogger = logging.getLogger('-')  # Logger da aplicação
+gLogger.addHandler(logHandler)
+
+# Lê os parâmetros da aplicação
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "h", [])
+except getopt.GetoptError:
+    print('photosync.py -h (help)')
+    sys.exit(2)
+for opt, arg in opts:
+    if opt == '-h':
+        print("\nPrograma para sincronização de arquivos")
+        print("\nUso: photosync.py -h (help)")
+        print("\nExemplo: ./photosync.py")
+        sys.exit()
+
+# Força UTF-8 por padrão
+if sys.version_info < (3, 0):
+    reload(sys)
+    sys.setdefaultencoding("utf-8")
+
+if not os.path.isfile(ARQUIVO_XML_SETTINGS):
+    set_app_settings("dirDestino", str(os.path.expanduser('~')))
+    set_app_settings("dir_origem", str(os.path.expanduser('~')))
+    set_app_settings("extensoes_video", "wmv|avi|mpg|3gp|mov|m4v|mts|mp4")
+    set_app_settings("extensoes_foto", "dof|arw|raw|jpg|jpeg|png|nef")
+    set_app_settings("codec_video", "0")
+    set_app_settings("caminho_ffmpeg", "ffmpeg")
+
+mainWindow = MainWindow()
+
+# Verifica a presença do ffmpeg
+if not spawn.find_executable(get_caminho_ffmpeg()):
+    info = InputDialog(mainWindow, 'Informe o caminho para o ffmpeg', '', None).show_and_get_info()
+    if info is None or not spawn.find_executable(info):
+        print("Não foi possível encontrar o aplicativo necessário ffmpeg.")
+        print("Verifique a configuração do caminho do ffmpeg no arquivo settings.xml")
+        print("A configuração atual é: " + get_caminho_ffmpeg())
+        sys.exit(2)
+    else:
+        set_app_settings("caminho_ffmpeg", info)
+
+# Exibe as aopções de codec de acordo com a disponibilidade do ffmpeg
 if "--enable-libx264" in get_ffmpeg_features():
     CODECS_VIDEO.append(VIDEO_H264)
 
@@ -1472,6 +1581,6 @@ if "--enable-libvpx" in get_ffmpeg_features():
 GObject.threads_init()
 
 # Monta a UI
-win.connect('delete-event', on_close)
-win.show_all()
+mainWindow.connect('delete-event', on_close)
+mainWindow.show_all()
 Gtk.main()
