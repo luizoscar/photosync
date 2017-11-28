@@ -349,7 +349,7 @@ class InputDialog(Gtk.Dialog):
         topbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         topbox.pack_start(Gtk.Label(label=message, halign=Gtk.Align.START), True, True, 0)
 
-        debug("Solicitação de informção ao usuário: " + message)
+        debug("Solicitação de informação ao usuário: " + message)
         if opcoes is None:
             # Campo de texto
             self.textField = Gtk.Entry()
@@ -708,7 +708,7 @@ class MainWindow(Gtk.Window):
     Janela principal da aplicação
     """
     
-    colunas = ["Copiar", "Status", "Arquivo", "Destino", "Tipo", "Tamanho", "Detalhes"]
+    COLUNAS_GRID = ["Copiar", "Status", "Arquivo", "Destino", "Tipo", "Tamanho", "Detalhes"]
     popupMenuTree = Gtk.Menu()
 
     def __init__(self):
@@ -717,7 +717,7 @@ class MainWindow(Gtk.Window):
         self.set_icon_name("application-x-executable")
         Gtk.Settings().set_property('gtk_button_images', True)
 
-        # Clipboar para cópia do texto
+        # Clipboard para cópia do texto
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
 
         self.set_resizable(True)
@@ -805,7 +805,7 @@ class MainWindow(Gtk.Window):
         # self.filtro.set_visible_func(self.do_filter_grid)
         cellRenderer = Gtk.CellRendererText()
 
-        # Adiciona as colunas ao TreeView
+        # Adiciona as COLUNAS_GRID ao TreeView
         self.treeview = Gtk.TreeView(model=self.store)
         self.treeview.connect("button_press_event", self.do_show_popup)
 
@@ -818,8 +818,8 @@ class MainWindow(Gtk.Window):
         col2.set_sort_column_id(1)
         self.treeview.append_column(col2)
 
-        # Adiciona as demais colunas
-        for i, column_title in enumerate(self.colunas):
+        # Adiciona as demais COLUNAS_GRID
+        for i, column_title in enumerate(self.COLUNAS_GRID):
             column = Gtk.TreeViewColumn(column_title, cellRenderer, text=i)
             if i > 1:  # Colunas 0 e 1 são do checkbox e icon e foram adicionadas anteriormente
                 self.treeview.append_column(column)
@@ -1306,9 +1306,9 @@ def compareTreeItem(model, row1, row2, user_data):  # @UnusedVariable
     Compara 2 ítens de uma tree
     """
     
-    sort_column, _ = model.get_sort_column_id()
-    value1 = model.get_value(row1, sort_column)
-    value2 = model.get_value(row2, sort_column)
+    sortColumn, _ = model.get_sort_column_id()
+    value1 = model.get_value(row1, sortColumn)
+    value2 = model.get_value(row2, sortColumn)
 
     if value1 < value2:
         return -1
@@ -1401,7 +1401,13 @@ def debug(msg=''):
     """
     Loga uma mensagem
     """
-    gLogger.debug(str(msg).strip())
+    
+    try:
+        linha = str(msg).strip()
+    except (UnicodeEncodeError):
+        linha = msg.encode("utf-8").strip()
+
+    logger.debug(linha)
 
 
 def to_human_size(nbytes):
